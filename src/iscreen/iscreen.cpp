@@ -3095,8 +3095,9 @@ void iScreenDispatcher::ProcessEvent(iScreenEvent *p) {
 					}
 					break;
 				case EV_INPUT_STRING:
-					if (cm->time + cm->start_time == p->cur_time + 1)
+					if (cm->time + cm->start_time == p->cur_time + 1) {
 						flags &= ~(SD_INPUT_STRING | SD_FINISH_INPUT);
+					}
 					break;
 				}
 			}
@@ -3649,7 +3650,12 @@ void iScreenDispatcher::init_input_string(iScreenElement *p) {
 }
 
 void iScreenDispatcher::input_string_quant(void) {
-	SDL_StartTextInput();
+#ifdef __SWITCH__
+	// Key-name capture must not open the system keyboard (it hangs the game);
+	// ordinary text fields (pilot name) may use it.
+	if (ActiveEl && !(ActiveEl->flags & EL_KEY_NAME))
+#endif
+		SDL_StartTextInput();
 	int sz, init_flag = 0, redraw_flag = 0;
 	iListElementPtr *tmp;
 	iScreenObject *obj;
@@ -3673,7 +3679,60 @@ void iScreenDispatcher::input_string_quant(void) {
 
 	while (KeyBuf->size) {
 		SDL_Event *event = KeyBuf->get();
-		if (event->type != SDL_KEYDOWN && event->type != SDL_TEXTINPUT)
+#ifdef __SWITCH__
+		// No keyboard: pick characters with the D-pad.
+		// Up/Down = next/previous character, Right or A = accept, Left or B = backspace,
+		// + = finish, - = cancel (synthetic Escape from xpad_cursor).
+		if (event->type == SDL_CONTROLLERBUTTONDOWN && !(ActiveEl->flags & EL_KEY_NAME)) {
+			static const char cs_text[] =
+				"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -._";
+			static const char cs_num[] = "0123456789";
+			static int ci = 0;
+			const char *cs = (ActiveEl->flags & EL_NUMBER) ? cs_num : cs_text;
+			int nb = (int)strlen(cs);
+			if (ci >= nb)
+				ci = 0;
+			int b = event->cbutton.button;
+			sz = strlen((char *)ptr);
+			if (b == SDL_CONTROLLER_BUTTON_DPAD_UP || b == SDL_CONTROLLER_BUTTON_DPAD_DOWN ||
+				b == SDL_CONTROLLER_BUTTON_RIGHTSHOULDER || b == SDL_CONTROLLER_BUTTON_LEFTSHOULDER) {
+				int step = (b == SDL_CONTROLLER_BUTTON_DPAD_UP) ? 1
+					: (b == SDL_CONTROLLER_BUTTON_DPAD_DOWN) ? nb - 1
+					: (b == SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) ? 10 : nb - 10 % nb;
+				ci = (ci + step) % nb;
+				ptr[sz - 1] = cs[ci];
+				init_flag = 1;
+				redraw_flag = 1;
+			} else if (b == SDL_CONTROLLER_BUTTON_DPAD_RIGHT || b == SDL_CONTROLLER_BUTTON_B) {
+				if (sz < cur_max_input) {
+					ptr[sz - 1] = cs[ci];
+					ptr[sz] = '_';
+					ptr[sz + 1] = 0;
+					init_flag = 1;
+					redraw_flag = 1;
+				}
+			} else if (b == SDL_CONTROLLER_BUTTON_DPAD_LEFT || b == SDL_CONTROLLER_BUTTON_A) {
+				if (sz > 1) {
+					ptr[sz - 1] = 0;
+					ptr[sz - 2] = '_';
+					init_flag = 1;
+					redraw_flag = 1;
+				}
+			} else if (b == SDL_CONTROLLER_BUTTON_START) {
+				ptr[sz - 1] = 0;
+				flags ^= SD_INPUT_STRING;
+				flags |= SD_FINISH_INPUT;
+				init_flag = 1;
+				redraw_flag = 1;
+			}
+			continue;
+		}
+#endif
+		if (event->type != SDL_KEYDOWN && event->type != SDL_TEXTINPUT
+#ifdef __SWITCH__
+			&& event->type != SDL_CONTROLLERBUTTONDOWN
+#endif
+		)
 			continue;
 
 		if (!(ActiveEl->flags & EL_KEY_NAME)) {
@@ -3758,8 +3817,28 @@ void iScreenDispatcher::input_string_quant(void) {
 			}
 		} else {
 			int k = sdlEventToCode(event);
+#ifdef __SWITCH__
+			if (event->type == SDL_CONTROLLERBUTTONDOWN && event->cbutton.button != 64 + 1000) {
+				if (flags & SD_INPUT_STRING) {
+					int cb = event->cbutton.button | SDLK_GAMECONTROLLER_BUTTON_MASK;
+					key_name = iGetKeyNameText(cb, lang());
+					if (key_name) {
+						strcpy((char *)ptr, key_name);
+						flags ^= SD_INPUT_STRING;
+						flags |= SD_FINISH_INPUT;
+						init_flag = 1;
+						redraw_flag = 1;
+						iScreenLastInput = cb;
+					}
+				}
+				continue;
+			}
+#endif
 			if (!(k & 0x1000)) {
 				switch (k) {
+#ifdef __SWITCH__
+				case SDL_SCANCODE_ESCAPE:
+#endif
 				case SDLK_ESCAPE:
 					strcpy((char *)ptr, BackupStr);
 					flags ^= SD_INPUT_STRING;

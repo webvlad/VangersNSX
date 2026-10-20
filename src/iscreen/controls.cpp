@@ -1,5 +1,6 @@
 /* ---------------------------- INCLUDE SECTION ----------------------------- */
 
+#include "../xpad_cursor.h"
 #include "../global.h"
 
 #include "../xjoystick.h"
@@ -141,6 +142,31 @@ void iKeyControls::init(void) {
 	addDefaultCode(iKEY_JOYSTICK_SWITCH, VK_BUTTON_1);
 	setFlag(iKEY_JOYSTICK_SWITCH, iKEY_NO_RESET);
 
+#if defined(__SWITCH__) || defined(VANGERS_PAD_DEFAULTS)
+	// Default game-controller bindings for devices without a keyboard.
+	// Names follow SDL's position-based layout: A = bottom face button,
+	// B = right, X = left, Y = top. Slot 1 is used so that keyboard defaults
+	// in slot 0 stay intact; where slot 1 already held a keyboard alternative
+	// (RSHIFT, LCTRL, PAGEUP, PAGEDOWN) the controller binding replaces it.
+	// Triggers are analog axes in SDL and are not bindable here.
+#define VPAD(btn) (SDLK_GAMECONTROLLER_BUTTON_MASK | (btn))
+	addDefaultCode(iKEY_TURN_WHEELS_LEFT, VPAD(SDL_CONTROLLER_BUTTON_DPAD_LEFT), 1);
+	addDefaultCode(iKEY_TURN_WHEELS_RIGHT, VPAD(SDL_CONTROLLER_BUTTON_DPAD_RIGHT), 1);
+	addDefaultCode(iKEY_MOVE_FORWARD, VPAD(SDL_CONTROLLER_BUTTON_DPAD_UP), 1);
+	addDefaultCode(iKEY_MOVE_BACKWARD, VPAD(SDL_CONTROLLER_BUTTON_DPAD_DOWN), 1);
+	addDefaultCode(iKEY_ACCELERATION, VPAD(SDL_CONTROLLER_BUTTON_B), 1);
+	addDefaultCode(iKEY_FIRE_ALL_WEAPONS, VPAD(SDL_CONTROLLER_BUTTON_A), 1);
+	addDefaultCode(iKEY_HANDBRAKE, VPAD(SDL_CONTROLLER_BUTTON_X), 1);
+	addDefaultCode(iKEY_OPEN, VPAD(SDL_CONTROLLER_BUTTON_Y), 1);
+	addDefaultCode(iKEY_TURN_OVER_LEFT, VPAD(SDL_CONTROLLER_BUTTON_LEFTSHOULDER), 1);
+	addDefaultCode(iKEY_TURN_OVER_RIGHT, VPAD(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER), 1);
+	addDefaultCode(iKEY_DEVICE_ON, VPAD(SDL_CONTROLLER_BUTTON_RIGHTSTICK), 1);
+	addDefaultCode(iKEY_DEVICE_OFF, VPAD(SDL_CONTROLLER_BUTTON_LEFTSTICK), 1);
+	addDefaultCode(iKEY_INVENTORY, VPAD(SDL_CONTROLLER_BUTTON_START), 1);
+	addDefaultCode(iKEY_ACTIVATE_KID, VPAD(XPAD_VBUTTON_ZL), 1); // jump: hold to charge, release to jump
+#undef VPAD
+#endif
+
 	reset();
 }
 
@@ -272,9 +298,13 @@ int iKeyPressed(int id) {
 			if (code & SDLK_JOYSTICK_BUTTON_MASK && joy) {
 				state = SDL_JoystickGetButton(joy, code ^ SDLK_JOYSTICK_BUTTON_MASK);
 			} else if (code & SDLK_GAMECONTROLLER_BUTTON_MASK && ctrl) {
-				state = SDL_GameControllerGetButton(
-					ctrl, (SDL_GameControllerButton)(code ^ SDLK_GAMECONTROLLER_BUTTON_MASK)
-				);
+				int btn = code ^ SDLK_GAMECONTROLLER_BUTTON_MASK;
+				if (btn == XPAD_VBUTTON_ZL) // triggers are analogue axes: expose them as buttons
+					state = SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 16000;
+				else if (btn == XPAD_VBUTTON_ZR)
+					state = SDL_GameControllerGetAxis(ctrl, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 16000;
+				else
+					state = SDL_GameControllerGetButton(ctrl, (SDL_GameControllerButton)btn);
 			} else if (code & SDLK_JOYSTICK_HAT_MASK && joy) {
 				state = SDL_JoystickGetHat(joy, (code ^ SDLK_JOYSTICK_HAT_MASK) / 10) ==
 						(code ^ SDLK_JOYSTICK_HAT_MASK) % 10;

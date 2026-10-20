@@ -28,8 +28,16 @@ void XMessageBuffer::put(SDL_Event *p) {
 		if (LastIndex >= XMSG_BUFFER_SIZE)
 			LastIndex = 0;
 		Size++;
-	} else
-		ErrH.Abort("XMessageBuffer overflow...");
+	} else {
+		// Nobody drains the queue while the game is loading (many seconds), and an analogue
+		// stick generates axis events every frame. Aborting here killed the game on the Switch,
+		// so drop the newest events instead and report it once.
+		static bool reported = false;
+		if (!reported) {
+			reported = true;
+			std::cerr << "XMessageBuffer full: dropping input events" << std::endl;
+		}
+	}
 }
 
 /*void XMessageBuffer::put(HANDLE hWnd,int msg,SDL_Event &e)

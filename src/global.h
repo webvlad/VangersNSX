@@ -10,7 +10,7 @@
 #include <string.h>
 #include <time.h>
 
-#if (defined(__unix__) || defined(__APPLE__))
+#if (defined(__unix__) || defined(__APPLE__) || defined(__SWITCH__))
 #	include <dirent.h>
 #endif
 

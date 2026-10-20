@@ -2235,6 +2235,12 @@ void iHandleExtEvent(int code, int data) {
 	case iEXT_INIT_JOYSTICK:
 		JoystickMode = iGetOptionValue(iJOYSTICK_TYPE);
 		JoystickStickSwitchButton = iGetControlCode(iKEY_JOYSTICK_SWITCH);
+#ifdef __SWITCH__
+		// The GOG option defaults to "no joystick", and button 1 (the A button) doubles as the
+		// stick-switch modifier, which disables analogue driving while accelerating.
+		JoystickMode = JOYSTICK_Joystick;
+		JoystickStickSwitchButton = VK_BUTTON_1 + 31; // a button that never exists
+#endif
 		break;
 	case iEXT_UPDATE_SOUND_MODE:
 		if (!iGetOptionValue(iSOUND_ON)) {

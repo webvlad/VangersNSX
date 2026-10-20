@@ -44,7 +44,6 @@ static int XJoystickErrHUsed = 1;
 XJOYSTATE XJoystickState;
 
 int JoystickWhatsPressedNow() {
-	std::cout << "JoystickWhatsPressedNow " << std::endl;
 	if (!JoystickAvailable)
 		return 0;
 	if (SDL_GetTicks() > next_joystick_input) {
@@ -60,7 +59,6 @@ int JoystickWhatsPressedNow() {
 }
 
 int isJoystickButtonPressed(int vk_code) {
-	std::cout << "isJoystickButtonPressed " << vk_code << std::endl;
 	if (!JoystickAvailable)
 		return 0;
 	if (SDL_GetTicks() > next_joystick_input) {
@@ -213,7 +211,6 @@ void XJoystickCleanup(void) {
 //
 //===========================================================================
 int XJoystickInput() {
-	std::cout << "XJoystickInput" << std::endl;
 	if (!JoystickAvailable)
 		return 0;
 

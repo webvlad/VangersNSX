@@ -110,6 +110,7 @@ void xtUnRegisterSysQuant(int id);
 // int xtNeedExit(void);
 
 void xtClearMessageQueue(void);
+void xtSetFrameHook(void (*hook)(void));
 
 int xtInitApplication(void);
 void xtDoneApplication(void);

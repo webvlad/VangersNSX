@@ -360,7 +360,12 @@ int SoundInit(int maxHZ, int schannels) {
 
 	Mix_AllocateChannels(MAX_CHANNELS); */
 	// std::cout<<"SoundInit maxHZ:"<<maxHZ<<std::endl;
+#ifdef __SWITCH__
+	// 512 frames (~11 ms) underruns on the Switch whenever the game thread is busy: crackling.
+	context.init(maxHZ, 2, 2048);
+#else
 	context.init(maxHZ, 2, 512);
+#endif
 	g_freq = maxHZ;
 	context.set_max_sources(MAX_CHANNELS);
 	clunk_object = context.create_object();

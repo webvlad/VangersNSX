@@ -1,6 +1,7 @@
 
 /* ---------------------------- INCLUDE SECTION ----------------------------- */
 
+#include "../xpad_cursor.h"
 #include "../global.h"
 #include "../network.h"
 #include "../runtime.h"
@@ -778,6 +779,12 @@ void iPrepareOptions(void) {
 	iScrOpt[iCAMERA_SCALE]->objPtr = new iTriggerObject();
 
 	iScrOpt[iFULLSCREEN] = new iScreenOption(iTRIGGER, 0, "Graphics screen", "FullScreenTrig");
+	// The original GOG interface script (oftr.scb) predates some options (e.g. FpsTrig):
+	// fall back to a detached trigger so the callbacks below never dereference NULL.
+	if (!iScrOpt[iFULLSCREEN]->objPtr)
+		iScrOpt[iFULLSCREEN]->objPtr = new iTriggerObject();
+	if (!iScrOpt[iSCREEN_RESOLUTION]->objPtr)
+		iScrOpt[iSCREEN_RESOLUTION]->objPtr = new iTriggerObject();
 	((iTriggerObject *)iScrOpt[iFULLSCREEN]->objPtr)->callback = &iSetFullscreen;
 	((iTriggerObject *)iScrOpt[iSCREEN_RESOLUTION]->objPtr)->callback = &iSetResolution;
 
@@ -785,6 +792,8 @@ void iPrepareOptions(void) {
 		new iScreenOption(iTRIGGER, 0, "Controls screen", "AutoAccelerationTrig");
 
 	iScrOpt[iFPS_60] = new iScreenOption(iTRIGGER, 0, "Graphics screen", "FpsTrig");
+	if (!iScrOpt[iFPS_60]->objPtr)
+		iScrOpt[iFPS_60]->objPtr = new iTriggerObject();
 	((iTriggerObject *)iScrOpt[iFPS_60]->objPtr)->callback = &iSetFPS;
 
 	iPrepareControls();
@@ -811,6 +820,19 @@ iListElement *iGetObject(const char *scr, const char *obj) {
 	iListElement *el = NULL;
 	if (scr) {
 		p = (iScreen *)iScrDisp->get_object(scr);
+		if (!p) {
+			// Diagnostics: report which screens the script parser actually produced.
+			fprintf(stderr, "iGetObject: screen '%s' (object '%s') not found. Known screens:\n", scr, obj);
+			iObjID *sid = (iObjID *)iScrDisp->ScreenIDs->last;
+			int cnt = 0;
+			while (sid) {
+				fprintf(stderr, "  [%d] '%s'\n", cnt++, sid->ID);
+				sid = (iObjID *)sid->prev;
+			}
+			fprintf(stderr, "Total: %d\n", cnt);
+			fflush(stderr);
+			return NULL;
+		}
 		el = p->get_object(obj);
 	} else {
 		el = iScrDisp->get_object(obj);
@@ -2460,6 +2482,10 @@ const char *iGetKeyNameText(int vkey, Language lang, bool scan) {
 		else
 			return "jbutton_unknow";
 	} else if (vkey & SDLK_GAMECONTROLLER_BUTTON_MASK) {
+		if ((vkey ^ SDLK_GAMECONTROLLER_BUTTON_MASK) == XPAD_VBUTTON_ZL)
+			return "zl";
+		if ((vkey ^ SDLK_GAMECONTROLLER_BUTTON_MASK) == XPAD_VBUTTON_ZR)
+			return "zr";
 		return SDL_GameControllerGetStringForButton(
 			(SDL_GameControllerButton)(vkey ^ SDLK_GAMECONTROLLER_BUTTON_MASK)
 		);

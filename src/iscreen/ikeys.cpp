@@ -26,7 +26,11 @@ void KBD_init(void) {
 
 void key(SDL_Event *key) {
 	if (KeyBuf->flag & KBD_ENABLE &&
-		(key->type == SDL_KEYDOWN || key->type == SDL_TEXTINPUT || key->type == SDL_MOUSEWHEEL)) {
+		(key->type == SDL_KEYDOWN || key->type == SDL_TEXTINPUT || key->type == SDL_MOUSEWHEEL
+#ifdef __SWITCH__
+	  || key->type == SDL_CONTROLLERBUTTONDOWN
+#endif
+	  )) {
 		KeyBuf->put(key, CUR_KEY_PRESSED);
 	}
 }

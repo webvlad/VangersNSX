@@ -66,6 +66,7 @@ SET(vangers_SRCS
 	uvs/screen.cpp
 	uvs/univang.cpp
 	xjoystick.cpp
+	xpad_cursor.cpp
 	xsocket.cpp
 	zmod_client.cpp
 	${WINDOWS_RES}
@@ -104,4 +105,20 @@ else()
 		xgraph
 		xsound
 	)
+
+	IF(NINTENDO_SWITCH)
+		# Static libraries reference each other in both directions: rescan them.
+		# (Plain linker flags: CMake's LINK_GROUP feature is not defined for this toolchain.)
+		TARGET_LINK_LIBRARIES(vangers
+			-Wl,--start-group xtool xgraph xsound clunk -Wl,--end-group
+			${SWITCH_LIBS}
+		)
+		nx_generate_nacp(
+			OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/vangers.nacp
+			NAME "Vangers"
+			AUTHOR "K-D Lab / KranX"
+			VERSION "2.0-switch"
+		)
+		nx_create_nro(vangers NACP ${CMAKE_CURRENT_BINARY_DIR}/vangers.nacp)
+	ENDIF()
 endif(ANDROID)

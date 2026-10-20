@@ -13,11 +13,11 @@
 
 #include <vector>
 
-#if defined(__unix__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__) || defined(__SWITCH__)
 #	include <sys/stat.h>
 #endif
 
-#if !(defined(__unix__) || defined(__APPLE__))
+#if !(defined(__unix__) || defined(__APPLE__) || defined(__SWITCH__))
 static WIN32_FIND_DATA FFdata;
 static HANDLE FFh;
 
@@ -768,7 +768,7 @@ static int should_load_world_mobile_location(const char *fname) {
 }
 #endif
 
-#if defined(__unix__) || defined(__APPLE__)
+#if defined(__unix__) || defined(__APPLE__) || defined(__SWITCH__)
 static int is_regular_file(const std::string &directory, const char *name) {
 	struct stat info;
 	const std::string path = directory + name;
@@ -816,7 +816,7 @@ void MLload(void) {
 			MLTnt[i] = 0;
 	};
 #endif
-#if !(defined(__unix__) || defined(__APPLE__))
+#if !(defined(__unix__) || defined(__APPLE__) || defined(__SWITCH__))
 	buf.init();
 	buf < "data.vot/*.vot";
 	char *fn = win32_findfirst(GetTargetName(buf.GetBuf()));

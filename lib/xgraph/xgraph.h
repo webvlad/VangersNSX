@@ -187,6 +187,11 @@ struct XGR_Screen {
 
 	void clear_2d_surface();
 
+	// Nintendo Switch workaround: inside this rectangle a 2D-layer pixel with palette index
+	// viewKeyIndex is treated as transparent (see blitRgba). -1 disables it.
+	int viewKeyIndex = -1;
+	int viewX0 = 0, viewY0 = 0, viewX1 = 0, viewY1 = 0;
+
 	uint8_t *get_active_render_buffer();
 	uint8_t *get_default_render_buffer();
 	uint8_t *get_2d_render_buffer();

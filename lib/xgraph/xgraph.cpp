@@ -208,6 +208,9 @@ int XGR_Screen::init(int flags_in) {
 	SDL_RenderPresent(sdlRenderer);
 
 	std::cout << "SDL_SetHint" << std::endl;
+#ifdef __SWITCH__
+	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
+#endif
 	SDL_SetHint(
 		SDL_HINT_RENDER_SCALE_QUALITY, "best"
 	); // "linear" make the scaled rendering look smoother.
@@ -871,7 +874,13 @@ void XGR_Screen::blitRgba(
 
 	for (y = xgrScreenSizeY; y > 0; --y) {
 		for (x = xgrScreenSizeX; x > 0; --x) {
-			if (*screen2DIndexes != 0) {
+			bool opaque2d = *screen2DIndexes != 0;
+			if (opaque2d && viewKeyIndex >= 0 && *screen2DIndexes == viewKeyIndex) {
+				int px = xgrScreenSizeX - x, py = xgrScreenSizeY - y;
+				if (px >= viewX0 && px < viewX1 && py >= viewY0 && py < viewY1)
+					opaque2d = false;
+			}
+			if (opaque2d) {
 				*dstRgba = XGR32_PaletteCache[*screen2DIndexes];
 			} else if (((uint8_t *)screen2DRgba)[3] != 0) {
 				*dstRgba = *screen2DRgba;
@@ -2888,9 +2897,11 @@ void XGR_MouseFnc(SDL_Event *p) {
 
 	// Mouse motion
 	if (p->type == SDL_MOUSEMOTION) {
+#ifndef __SWITCH__
 		if (p->motion.which == SDL_TOUCH_MOUSEID) {
 			return;
 		}
+#endif
 		// std::cout<<"x:"<<p->motion.x<<" y:"<<p->motion.y<<std::endl;
 		x = p->motion.x;
 		y = p->motion.y;
@@ -2928,6 +2939,17 @@ void XGR_MouseFnc(SDL_Event *p) {
 			break;
 		}
 
+#ifdef __SWITCH__
+		// Touchscreen: move the pointer to the tap position before the click lands.
+		if (p->button.which == SDL_TOUCH_MOUSEID) {
+			int tx = p->button.x, ty = p->button.y;
+			int ox = XGR_MouseObj.PosX, oy = XGR_MouseObj.PosY;
+			XGR_MouseObj.InitPos(tx, ty);
+			XGR_MouseObj.MovementX = tx - ox;
+			XGR_MouseObj.MovementY = ty - oy;
+			XGR_MouseObj.Move(0, XGR_MouseObj.PosX, XGR_MouseObj.PosY);
+		}
+#endif
 		// TODO(amdmi3): secound arg is button state; needed?
 		if (p->type == SDL_MOUSEBUTTONUP)
 			XGR_MouseUnPress(flag, 0, XGR_MouseObj.PosX, XGR_MouseObj.PosY);

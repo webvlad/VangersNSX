@@ -1,6 +1,14 @@
 SET(CMAKE_OSX_DEPLOYMENT_TARGET "10.12" CACHE STRING "Minimum OS X deployment version")
 CMAKE_MINIMUM_REQUIRED(VERSION 4.0.0)
 
+# Nintendo Switch cross build on a Windows (MSYS) host: the native devkitA64 compiler
+# writes depfiles with "D:/..." paths and make reads the colon as a target separator
+# ("multiple target patterns"). Let CMake compute header dependencies itself.
+# This must be set BEFORE project() (the toolchain file is not loaded yet, so test its name).
+IF(CMAKE_TOOLCHAIN_FILE MATCHES "Switch")
+	SET(CMAKE_DEPENDS_USE_COMPILER FALSE)
+ENDIF()
+
 # root
 PROJECT(vangers)
 
@@ -23,7 +31,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Nintendo Switch (devkitPro toolchain sets CMAKE_SYSTEM_NAME to NintendoSwitch)
+IF(CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
+	SET(NINTENDO_SWITCH ON)
+ENDIF()
+
 # depends
+IF(NINTENDO_SWITCH)
+	INCLUDE(SwitchDeps)
+ELSE()
 FIND_PACKAGE(SDL2 REQUIRED)
 FIND_PACKAGE(SDL2_net REQUIRED)
 FIND_PACKAGE(Ogg REQUIRED)
@@ -34,6 +50,7 @@ FIND_PACKAGE(Clunk REQUIRED)
 
 FIND_PACKAGE(FFMPEG REQUIRED)
 FIND_PACKAGE(ZLIB REQUIRED)
+ENDIF()
 set(WINDOWS_RES "../vangers.res")
 
 IF(BINARY_SCRIPT)
@@ -118,7 +135,7 @@ ADD_SUBDIRECTORY("lib/xgraph")
 ADD_SUBDIRECTORY("lib/xsound")
 ADD_SUBDIRECTORY("lib/xtool")
 
-if(NOT ANDROID)
+if(NOT ANDROID AND NOT NINTENDO_SWITCH)
 	ADD_SUBDIRECTORY("lib/utils")
 	ADD_SUBDIRECTORY("server")
 	ADD_SUBDIRECTORY("surmap")

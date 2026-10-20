@@ -5263,6 +5263,11 @@ int acsQuant(void) {
 		if (e->type == SDL_KEYDOWN) {
 			k = sdlEventToCode(e);
 		}
+#ifdef __SWITCH__
+		if (e->type == SDL_CONTROLLERBUTTONDOWN && acsScrD->activeInput) {
+			acsScrD->KeyTrap(0, e); // D-pad text entry
+		}
+#endif
 		if (e->type == SDL_KEYDOWN || e->type == SDL_TEXTINPUT) {
 			acsScrD->KeyTrap(0, e);
 			if (e->key.keysym.scancode == SDL_SCANCODE_ESCAPE && !acsScrD->QuantCode) {
@@ -7536,6 +7541,8 @@ int sdlEventToCode(SDL_Event *event) {
 	case SDL_KEYDOWN:
 	case SDL_KEYUP:
 		return event->key.keysym.scancode;
+	case SDL_CONTROLLERBUTTONDOWN:
+		return event->cbutton.button | SDLK_GAMECONTROLLER_BUTTON_MASK;
 	case SDL_MOUSEBUTTONDOWN:
 	case SDL_MOUSEBUTTONUP:
 		switch (event->button.button) {

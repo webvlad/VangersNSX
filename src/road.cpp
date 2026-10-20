@@ -1,4 +1,5 @@
 #define _ROAD_
+#include <algorithm>
 #include "zmod_client.h"
 
 #include "global.h"
@@ -28,6 +29,7 @@
 
 #include "network.h"
 #include "xjoystick.h"
+#include "xpad_cursor.h"
 
 #include "3d/3d_math.h"
 #include "3d/3dgraph.h"
@@ -540,6 +542,7 @@ int xtInitApplication(void) {
 	if (XJoystickInit()) {
 		std::cout << "Joystick found\n";
 		JoystickMode = JOYSTICK_Joystick;
+		XPadCursorInstall();
 	} else {
 		std::cout << "Joystick not found" << std::endl;
 	}
@@ -1100,12 +1103,16 @@ void FirstEscaveRTO::Finit(void) {
 	_MEM_STATISTIC_("AFTER FIRST ESCAVE FINIT -> ");
 }
 
+int g_xpad_in_race = 0; // read by the gamepad pointer emulation (xpad_cursor.cpp)
+
 void GameQuantRTO::Init(int id) {
+	g_xpad_in_race = 1;
 	vMap->lockHeap();
 	_MEM_STATISTIC_("AFTER GAME QUANT INIT -> ");
 }
 
 void GameQuantRTO::Finit() {
+	g_xpad_in_race = 0;
 	XGR_Obj.clear_2d_surface();
 }
 
@@ -1936,6 +1943,7 @@ void iGameMap::flush() {
 	XGR_Flush(xc - xside, yc - yside, xsize, ysize);
 }
 
+
 void iGameMap::draw(int self) {
 	static XBuffer status;
 	static int blink, clcnt;
@@ -2158,6 +2166,29 @@ void iGameMap::draw(int self) {
 // 2D Rendring in game.
 #ifdef ACTINT
 		XGR_Obj.set_2d_render_buffer();
+#	ifdef __SWITCH__
+		{
+			// The 2D layer arrives with a solid near-black fill over the whole game view and
+			// hides the 3D world behind it (cause not found yet, see SWITCH_PORT_NOTES.md).
+			// Remember that fill colour on the first frame and treat it as transparent inside
+			// the view rectangle (not in the full-screen inventory/map modes).
+			static int viewKey = -1;
+			static bool keyed = false;
+			if (!g_xpad_in_race) {
+				keyed = false;
+				viewKey = -1;
+			} else if (!keyed) {
+				viewKey = XGR_Obj.get_2d_render_buffer()[yc * xgrScreenSizeX + xc];
+				keyed = true;
+			}
+			bool windowed = xside * 2 < xgrScreenSizeX - 20;
+			XGR_Obj.viewKeyIndex = (g_xpad_in_race && windowed && viewKey > 0) ? viewKey : -1;
+			XGR_Obj.viewX0 = std::max(0, xc - xside);
+			XGR_Obj.viewX1 = std::min(xgrScreenSizeX, xc + xside);
+			XGR_Obj.viewY0 = std::max(0, yc - yside);
+			XGR_Obj.viewY1 = std::min(xgrScreenSizeY, yc + yside);
+		}
+#	endif
 		// XGR_Obj.fill(2);
 		if (GeneralSystemSkip) {
 			aScrDisp->redraw();

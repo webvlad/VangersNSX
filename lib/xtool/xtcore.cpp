@@ -5,6 +5,11 @@
 #include "xglobal.h"
 #include "xt_list.h"
 
+#ifdef __SWITCH__
+#	include <stdio.h>
+#	include <unistd.h>
+#endif
+
 #if defined(__unix__) || defined(__linux__) || defined(__APPLE__)
 #	include <locale.h>
 #endif
@@ -116,6 +121,16 @@ int main(int argc, char *argv[])
 	int id, prevID, clockDelta, clockCnt, clockNow, clockCntGlobal, clockNowGlobal;
 	__internal_argc = argc;
 	__internal_argv = argv;
+
+#ifdef __SWITCH__
+	// No console on the Switch: keep logs on the SD card and run from the data directory.
+	freopen("sdmc:/switch/vangers/stdout.txt", "w", stdout);
+	freopen("sdmc:/switch/vangers/stderr.txt", "w", stderr);
+	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stderr, NULL, _IONBF, 0);
+	chdir("sdmc:/switch/vangers/data");
+	XGR_FULL_SCREEN = true;
+#endif
 
 #ifdef _WIN32
 	std::cout << "Load backtrace" << std::endl;
@@ -574,7 +589,15 @@ int xtDispatchMessage(SDL_Event *msg) {
 	return ret;
 }
 
+static void (*xtFrameHook)(void) = nullptr;
+
+void xtSetFrameHook(void (*hook)(void)) {
+	xtFrameHook = hook;
+}
+
 void xtClearMessageQueue(void) {
+	if (xtFrameHook)
+		xtFrameHook();
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {
 		// std::cout<<"event "<<event.type<<std::endl;

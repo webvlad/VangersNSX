@@ -1485,6 +1485,43 @@ void aciScreenDispatcher::InputQuant(SDL_Event *event) {
 		return;
 	}
 
+#ifdef __SWITCH__
+	if (event != nullptr && event->type == SDL_CONTROLLERBUTTONDOWN) {
+		// No keyboard: pick characters with the D-pad.
+		static const char cs[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -._";
+		static int ci = 0;
+		const int nb = (int)sizeof(cs) - 1;
+		int b = event->cbutton.button;
+		ptr = (unsigned char *)activeInput->string;
+		sz = strlen((char *)ptr);
+		if (b == SDL_CONTROLLER_BUTTON_DPAD_UP || b == SDL_CONTROLLER_BUTTON_DPAD_DOWN ||
+			b == SDL_CONTROLLER_BUTTON_RIGHTSHOULDER || b == SDL_CONTROLLER_BUTTON_LEFTSHOULDER) {
+			int step = (b == SDL_CONTROLLER_BUTTON_DPAD_UP) ? 1
+				: (b == SDL_CONTROLLER_BUTTON_DPAD_DOWN) ? nb - 1
+				: (b == SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) ? 10 : nb - 10;
+			ci = (ci + step) % nb;
+			if (sz > 0)
+				ptr[sz - 1] = cs[ci];
+			activeInput->flags |= ACS_REDRAW_OBJECT;
+		} else if (b == SDL_CONTROLLER_BUTTON_DPAD_RIGHT || b == SDL_CONTROLLER_BUTTON_B) {
+			if (sz > 0 && sz <= activeInput->MaxStrLen) {
+				ptr[sz - 1] = cs[ci];
+				ptr[sz] = '_';
+				ptr[sz + 1] = 0;
+				activeInput->flags |= ACS_REDRAW_OBJECT;
+			}
+		} else if (b == SDL_CONTROLLER_BUTTON_DPAD_LEFT || b == SDL_CONTROLLER_BUTTON_A) {
+			if (sz > 1) {
+				ptr[sz - 1] = 0;
+				ptr[sz - 2] = '_';
+				activeInput->flags |= ACS_REDRAW_OBJECT;
+			}
+		} else if (b == SDL_CONTROLLER_BUTTON_START) {
+			DoneInput();
+		}
+		return;
+	}
+#endif
 	if (!(event != nullptr && (event->type == SDL_KEYDOWN || event->type == SDL_TEXTINPUT)))
 		return;
 
@@ -1578,7 +1615,7 @@ void aciScreenDispatcher::PrepareInput(int obj_id) {
 		p->string[sz] = 0;
 		p->flags |= ACS_ACTIVE_STRING;
 		activeInput = p;
-		SDL_StartTextInput();
+		SDL_StartTextInput(); // Switch: opens the system software keyboard
 	}
 }
 

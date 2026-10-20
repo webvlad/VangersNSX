@@ -2949,6 +2949,27 @@ void Object::direct_keyboard_control() {
 #endif
 
 void Object::direct_joystick_control() {
+#ifdef __SWITCH__
+	{
+		SDL_GameController *gc = get_gamecontroller();
+		if (!gc)
+			return;
+		SDL_GameControllerUpdate();
+		int ax = SDL_GameControllerGetAxis(gc, SDL_CONTROLLER_AXIS_LEFTX) / 128; // -256..255
+		int ay = SDL_GameControllerGetAxis(gc, SDL_CONTROLLER_AXIS_LEFTY) / 128;
+		if (abs(ax) < 40)
+			ax = 0;
+		if (abs(ay) < 40)
+			ay = 0;
+		if (!ax && !ay)
+			return; // stick idle: keep D-pad / keyboard result
+		traction = -ay;
+		rudder = -ax * rudder_max >> 8;
+		if (abs(ay) > 230)
+			controls(CONTROLS::TURBO_QUANT);
+		return;
+	}
+#endif
 	if (!XJoystickInput())
 		return;
 
@@ -3050,8 +3071,12 @@ void Object::analysis() {
 			entries_control();
 			if (!disable_control) {
 				direct_keyboard_control();
+#ifdef __SWITCH__
+				direct_joystick_control();
+#else
 				/*if(JoystickMode)
 					direct_joystick_control();*/
+#endif
 			}
 		}
 	}
