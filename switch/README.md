@@ -44,3 +44,12 @@ Compiler flags in `cmake/SwitchDeps.cmake` disable some optimizations the engine
 ## Language
 The game language is chosen by a command-line flag (`-russian`) in the original; on the Switch create an empty file
 `sd:/switch/vangers/russian` to start in Russian (delete it to go back to English).
+
+## 60 FPS (experimental)
+Create an empty file `sd:/switch/vangers/fps60` to run the game at 60 FPS (physics and rendering; the world logic still
+ticks at 20 Hz). Delete the file to return to 20 FPS. Heavy scenes may drop below 60.
+
+## Debug log
+By default `stdout.txt` only gets start-up information and errors. Create an empty file `sd:/switch/vangers/debug`
+to also write per-5-second FPS statistics (`PERF`) and a per-stage breakdown of every frame longer than 120 ms (`SLOW frame`).
+Please attach such a log when reporting performance problems.

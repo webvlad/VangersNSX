@@ -13,6 +13,7 @@ extern "C" {
 }
 extern unsigned g_prof_blit_us, g_prof_render_us, g_prof_present_us;
 extern unsigned g_stage_us[8];
+static bool g_debugLog = false; // empty file sd:/switch/vangers/debug enables PERF/SLOW lines
 static ClkrstSession g_cpuClk;
 static bool g_cpuClkOpen = false;
 static u32 g_cpuClkOrig = 0;
@@ -147,6 +148,9 @@ int main(int argc, char *argv[])
 	setvbuf(stderr, NULL, _IONBF, 0);
 	chdir("sdmc:/switch/vangers/data");
 	XGR_FULL_SCREEN = true;
+	g_debugLog = access("sdmc:/switch/vangers/debug", F_OK) == 0;
+	if (g_debugLog)
+		std::cout << "Debug log enabled (flag file found)" << std::endl;
 	// No command line on the console: an empty file "russian" next to the nro switches the game to Russian.
 	if (access("sdmc:/switch/vangers/russian", F_OK) == 0) {
 		setLang(RUSSIAN);
@@ -309,7 +313,7 @@ int main(int argc, char *argv[])
 				acc_q += prof_quant_ms;
 				acc_f += flip_ms;
 				acc_n++;
-				if (frame_ms > 120 && frame_ms < 2000) {
+				if (g_debugLog && frame_ms > 120 && frame_ms < 2000) {
 					std::cout << "SLOW frame " << frame_ms << " ms: quant=" << prof_quant_ms << " events=" << prof_xrec_ms
 							  << " [sound=" << g_stage_us[0] / 1000 << " actint=" << g_stage_us[1] / 1000
 							  << " uvs=" << g_stage_us[2] / 1000 << " moveland=" << g_stage_us[3] / 1000
@@ -319,11 +323,11 @@ int main(int argc, char *argv[])
 							  << ")\n";
 				}
 				static Uint32 last_flush = 0;
-				if (now - last_flush >= 2000) {
+				if (now - last_flush >= 2000) { // keep the log current even if the game crashes
 					fflush(stdout);
 					last_flush = now;
 				}
-				if (now - win_start >= 5000) {
+				if (now - win_start >= 5000 && g_debugLog) {
 					std::cout << "PERF " << acc_n * 1000 / (now - win_start) << " fps, avg quant=" << acc_q / acc_n
 							  << " ms flip=" << acc_f / acc_n << " ms (blit=" << g_prof_blit_us / 1000
 							  << " render=" << g_prof_render_us / 1000 << " present=" << g_prof_present_us / 1000

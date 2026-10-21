@@ -3,6 +3,9 @@
 
 #include "../xpad_cursor.h"
 #include "../global.h"
+#ifdef __SWITCH__
+#	include <unistd.h>
+#endif
 #include "../network.h"
 #include "../runtime.h"
 #include "../xjoystick.h"
@@ -634,6 +637,19 @@ void iSetFullscreen(int state) {
 }
 
 void iSetFPS(int state) {
+#ifdef __SWITCH__
+	// The GOG interface scripts have no 60 FPS menu item: an empty file "fps60" next to the nro enables it.
+	{
+		static int logged = 0;
+		bool flag = access("sdmc:/switch/vangers/fps60", F_OK) == 0;
+		if (flag)
+			state = 1;
+		if (!logged) {
+			logged = 1;
+			std::cout << "FPS mode: " << (state ? "60 (flag file or option)" : "20") << std::endl;
+		}
+	}
+#endif
 	if (state) {
 		RTO_GAME_QUANT_TIMER = 1000 / 60;
 		GAME_TIME_COEFF = 3;
