@@ -939,6 +939,12 @@ SDL_Surface *XGR_Screen::get_screenshot() {
 	return screenshotSurface;
 }
 
+#ifdef __SWITCH__
+unsigned g_prof_blit_us = 0, g_prof_render_us = 0, g_prof_present_us = 0;
+#	define PROF_NOW() SDL_GetPerformanceCounter()
+#	define PROF_US(a, b) ((unsigned)(((b) - (a)) * 1000000ULL / SDL_GetPerformanceFrequency()))
+#endif
+
 void XGR_Screen::flip() {
 	if (flags & XGR_INIT) {
 		set_2d_render_buffer();
@@ -951,6 +957,9 @@ void XGR_Screen::flip() {
 		set_default_render_buffer();
 
 		// std::cout<<"Flip"<<std::endl;
+#ifdef __SWITCH__
+		Uint64 pf0 = PROF_NOW();
+#endif
 		void *pixels;
 		int pitch;
 		SDL_LockTexture(sdlTexture, NULL, &pixels, &pitch);
@@ -961,6 +970,9 @@ void XGR_Screen::flip() {
 			get_2d_render_buffer()
 		);
 		SDL_UnlockTexture(sdlTexture);
+#ifdef __SWITCH__
+		Uint64 pf1 = PROF_NOW();
+#endif
 
 		SDL_RenderClear(sdlRenderer);
 
@@ -1001,7 +1013,16 @@ void XGR_Screen::flip() {
 			SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
 		}
 
+#ifdef __SWITCH__
+		Uint64 pf2 = PROF_NOW();
+#endif
 		SDL_RenderPresent(sdlRenderer);
+#ifdef __SWITCH__
+		Uint64 pf3 = PROF_NOW();
+		g_prof_blit_us = PROF_US(pf0, pf1);
+		g_prof_render_us = PROF_US(pf1, pf2);
+		g_prof_present_us = PROF_US(pf2, pf3);
+#endif
 
 		set_2d_render_buffer();
 		XGR_MouseObj.PutFon();

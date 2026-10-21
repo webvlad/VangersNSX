@@ -1944,22 +1944,41 @@ void iGameMap::flush() {
 }
 
 
+#ifdef __SWITCH__
+unsigned g_stage_us[8];
+static Uint64 g_stage_t;
+#	define ST_BEGIN() (memset(g_stage_us, 0, sizeof(g_stage_us)), g_stage_t = SDL_GetPerformanceCounter())
+#	define ST_END(i) \
+		do { \
+			Uint64 n_ = SDL_GetPerformanceCounter(); \
+			g_stage_us[i] += (unsigned)((n_ - g_stage_t) * 1000000ULL / SDL_GetPerformanceFrequency()); \
+			g_stage_t = n_; \
+		} while (0)
+#else
+#	define ST_BEGIN() ((void)0)
+#	define ST_END(i) ((void)0)
+#endif
+
 void iGameMap::draw(int self) {
 	static XBuffer status;
 	static int blink, clcnt;
 
+	ST_BEGIN();
 	if (!MuteLog && ((ConTimer.counter & 7) == 0)) {
 		SoundQuant();
 	}
+	ST_END(0);
 
 	if (GeneralSystemSkip && ++actQuantFrame >= (int)round(GAME_TIME_COEFF)) {
 		actIntQuant();
 		actQuantFrame = 0;
 	}
+	ST_END(1);
 	if (++uvsQuantFrame >= (int)round(GAME_TIME_COEFF)) {
 		uvsQuant();
 		uvsQuantFrame = 0;
 	}
+	ST_END(2);
 
 	if (GeneralSystemSkip && !ChangeWorldSkipQuant) {
 		if (curGMap) {
@@ -1969,8 +1988,10 @@ void iGameMap::draw(int self) {
 				MLquant(); // Moveland animation frame is here!!!
 				MLQuantFrame = 0;
 			}
+			ST_END(3);
 			// try {
 			GameD.Quant();
+			ST_END(4);
 			/*} catch (...) {
 				std::cout<<"ERROR:Some GameD.Quant is error."<<std::endl;
 			}*/
@@ -1997,9 +2018,11 @@ void iGameMap::draw(int self) {
 		}
 
 		// Отрисовка 3д моделей
+		ST_END(5);
 		if (curGMap) {
 			GameD.DrawQuant();
 		}
+		ST_END(6);
 
 		/*
 			if(recorder_mode){

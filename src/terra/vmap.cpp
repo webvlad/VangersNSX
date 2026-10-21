@@ -135,6 +135,28 @@ static int LockSuccess;
 static uchar *mappingPtr;
 #endif
 
+#ifdef __SWITCH__
+// Compressed world map (.vmc, ~23 MB) kept in RAM: reading terrain lines from the SD card while
+// driving caused 100-200 ms frame spikes.
+static uchar *g_vmcMem = nullptr;
+static void vmcCacheLoad(XStream &f) {
+	delete[] g_vmcMem;
+	g_vmcMem = nullptr;
+	long sz = f.size();
+	if (sz <= 0 || sz > 96 * 1024 * 1024)
+		return;
+	long pos = f.tell();
+	uchar *m = new (std::nothrow) uchar[sz];
+	if (!m)
+		return;
+	f.seek(0, XS_BEG);
+	f.read(m, sz);
+	f.seek(pos, XS_BEG);
+	g_vmcMem = m;
+	std::cout << "VMC cached in RAM: " << sz << " bytes" << std::endl;
+}
+#endif
+
 uchar **SkipLineTable;
 int preViewY;
 std::string path_to_world;
@@ -848,6 +870,10 @@ void vrtMap::load(const char *name, int nWorld) {
 
 	offset = 0;
 	foffset = fmap.tell();
+#ifdef __SWITCH__
+	if (isCompressed)
+		vmcCacheLoad(fmap);
+#endif
 
 	LoadVPR();
 	RenderPrepare();
@@ -989,6 +1015,10 @@ working."); #endif
 
 	offset = 0;
 	foffset = fmap.tell();
+#ifdef __SWITCH__
+	if (isCompressed)
+		vmcCacheLoad(fmap);
+#endif
 
 	freeMax = freeMax_c = MAX_LINE;
 	freeTail = freeTail_c = 0;
@@ -1192,8 +1222,15 @@ void vrtMap::accept(int up, int down) {
 				kmap.seek(i * H2_SIZE, XS_BEG);
 				kmap.read(p, H2_SIZE);
 			} else {
-				fmap.seek(st_table[i], XS_BEG);
-				fmap.read(inbuf, sz_table[i]);
+#ifdef __SWITCH__
+				if (g_vmcMem) {
+					memcpy(inbuf, g_vmcMem + st_table[i], sz_table[i]);
+				} else
+#endif
+				{
+					fmap.seek(st_table[i], XS_BEG);
+					fmap.read(inbuf, sz_table[i]);
+				}
 				ExpandBuffer(inbuf, p);
 			}
 
@@ -1569,8 +1606,15 @@ void vrtMap::linkC(int up, int down, int d) {
 				kmap.seek(i * H2_SIZE, XS_BEG);
 				kmap.read(p, H2_SIZE);
 			} else {
-				fmap.seek(st_table[i], XS_BEG);
-				fmap.read(inbuf, sz_table[i]);
+#ifdef __SWITCH__
+				if (g_vmcMem) {
+					memcpy(inbuf, g_vmcMem + st_table[i], sz_table[i]);
+				} else
+#endif
+				{
+					fmap.seek(st_table[i], XS_BEG);
+					fmap.read(inbuf, sz_table[i]);
+				}
 				ExpandBuffer(inbuf, p);
 			}
 

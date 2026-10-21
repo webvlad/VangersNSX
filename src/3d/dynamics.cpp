@@ -2963,9 +2963,13 @@ void Object::direct_joystick_control() {
 			ay = 0;
 		if (!ax && !ay)
 			return; // stick idle: keep D-pad / keyboard result
-		traction = -ay;
+		// Throttle follows the stick deflection (not only its vertical part), so diagonals keep speed.
+		int mag = (int)lround(sqrt((double)(ax * ax + ay * ay)));
+		if (mag > 256)
+			mag = 256;
+		traction = (ay > 40) ? -mag : mag; // pulled clearly back = reverse
 		rudder = -ax * rudder_max >> 8;
-		if (abs(ay) > 230)
+		if (mag > 230)
 			controls(CONTROLS::TURBO_QUANT);
 		return;
 	}

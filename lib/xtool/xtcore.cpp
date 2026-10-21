@@ -8,6 +8,23 @@
 #ifdef __SWITCH__
 #	include <stdio.h>
 #	include <unistd.h>
+extern "C" {
+#	include <switch/services/clkrst.h>
+}
+extern unsigned g_prof_blit_us, g_prof_render_us, g_prof_present_us;
+extern unsigned g_stage_us[8];
+static ClkrstSession g_cpuClk;
+static bool g_cpuClkOpen = false;
+static u32 g_cpuClkOrig = 0;
+static void switch_cpu_restore() {
+	if (g_cpuClkOpen) {
+		if (g_cpuClkOrig)
+			clkrstSetClockRate(&g_cpuClk, g_cpuClkOrig);
+		clkrstCloseSession(&g_cpuClk);
+		g_cpuClkOpen = false;
+	}
+	clkrstExit();
+}
 #endif
 
 #if defined(__unix__) || defined(__linux__) || defined(__APPLE__)
@@ -126,10 +143,27 @@ int main(int argc, char *argv[])
 	// No console on the Switch: keep logs on the SD card and run from the data directory.
 	freopen("sdmc:/switch/vangers/stdout.txt", "w", stdout);
 	freopen("sdmc:/switch/vangers/stderr.txt", "w", stderr);
-	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stdout, NULL, _IOFBF, 1 << 16); // flushed every ~2 s from the main loop (SD writes stall frames)
 	setvbuf(stderr, NULL, _IONBF, 0);
 	chdir("sdmc:/switch/vangers/data");
 	XGR_FULL_SCREEN = true;
+	// No command line on the console: an empty file "russian" next to the nro switches the game to Russian.
+	if (access("sdmc:/switch/vangers/russian", F_OK) == 0) {
+		setLang(RUSSIAN);
+		std::cout << "Language: Russian (flag file found)" << std::endl;
+	}
+	// The engine is CPU bound (software renderer): ask for the high CPU clock (1785 MHz).
+	if (R_SUCCEEDED(clkrstInitialize())) {
+		if (R_SUCCEEDED(clkrstOpenSession(&g_cpuClk, PcvModuleId_CpuBus, 3))) {
+			g_cpuClkOpen = true;
+			u32 hz = 0;
+			clkrstGetClockRate(&g_cpuClk, &hz);
+			g_cpuClkOrig = hz;
+			Result rc = clkrstSetClockRate(&g_cpuClk, 1785000000);
+			std::cout << "CPU clock " << hz << " -> 1785000000, result 0x" << std::hex << rc << std::dec << std::endl;
+			atexit(switch_cpu_restore);
+		}
+	}
 #endif
 
 #ifdef _WIN32
@@ -208,6 +242,9 @@ int main(int argc, char *argv[])
 		xtRTO_Log.open("xt_rto_w.log", XS_OUT);
 #endif
 
+#ifdef __SWITCH__
+	Uint32 prof_quant_ms = 0;
+#endif
 	while (XObj) {
 		XObj->Init(prevID);
 		prevID = id;
@@ -217,7 +254,13 @@ int main(int argc, char *argv[])
 		clockCntGlobal = clockCnt;
 		while (!id) {
 			if (XObj->Timer) {
+#ifdef __SWITCH__
+				Uint32 prof_t0 = SDL_GetTicks();
+#endif
 				id = XObj->Quant();
+#ifdef __SWITCH__
+				prof_quant_ms = SDL_GetTicks() - prof_t0;
+#endif
 				clockNow = clockNowGlobal = clocki();
 				clockDelta = clockNow - clockCnt;
 				XTCORE_FRAME_DELTA = (clockNowGlobal - clockCntGlobal) / 1000.0;
@@ -231,8 +274,10 @@ int main(int argc, char *argv[])
 					// std::cout<<"clockDelta:"<<clockDelta<<" Timer:"<<XObj->Timer<<std::endl;
 					SDL_Delay(XObj->Timer - clockDelta);
 				} else {
+#ifndef __SWITCH__
 					std::cout << "Strange deltas clockDelta:" << clockDelta
 							  << " Timer:" << XObj->Timer << std::endl;
+#endif
 					if (clockDelta > 300) {
 						// something wrong and for preventing abnormal physics set something neutral
 						XTCORE_FRAME_NORMAL = 1.0;
@@ -243,9 +288,52 @@ int main(int argc, char *argv[])
 				id = XObj->Quant();
 			}
 
+#ifdef __SWITCH__
+			Uint32 prof_x0 = SDL_GetTicks();
+#endif
 			if (!xtSysQuantDisabled)
 				XRec.Quant(); // впускает внешние события, записывает их или воспроизводит
+#ifdef __SWITCH__
+			Uint32 prof_f0 = SDL_GetTicks();
+			Uint32 prof_xrec_ms = prof_f0 - prof_x0;
+#endif
 			XGR_Flip();
+#ifdef __SWITCH__
+			{
+				static Uint32 acc_q = 0, acc_f = 0, acc_n = 0, win_start = 0, last_end = 0;
+				Uint32 now = SDL_GetTicks(), flip_ms = now - prof_f0;
+				if (!win_start)
+					win_start = now;
+				Uint32 frame_ms = last_end ? now - last_end : 0;
+				last_end = now;
+				acc_q += prof_quant_ms;
+				acc_f += flip_ms;
+				acc_n++;
+				if (frame_ms > 120 && frame_ms < 2000) {
+					std::cout << "SLOW frame " << frame_ms << " ms: quant=" << prof_quant_ms << " events=" << prof_xrec_ms
+							  << " [sound=" << g_stage_us[0] / 1000 << " actint=" << g_stage_us[1] / 1000
+							  << " uvs=" << g_stage_us[2] / 1000 << " moveland=" << g_stage_us[3] / 1000
+							  << " objects=" << g_stage_us[4] / 1000 << " terrain=" << g_stage_us[5] / 1000
+							  << " models=" << g_stage_us[6] / 1000 << "] flip=" << flip_ms << " (blit=" << g_prof_blit_us / 1000
+							  << " render=" << g_prof_render_us / 1000 << " present=" << g_prof_present_us / 1000
+							  << ")\n";
+				}
+				static Uint32 last_flush = 0;
+				if (now - last_flush >= 2000) {
+					fflush(stdout);
+					last_flush = now;
+				}
+				if (now - win_start >= 5000) {
+					std::cout << "PERF " << acc_n * 1000 / (now - win_start) << " fps, avg quant=" << acc_q / acc_n
+							  << " ms flip=" << acc_f / acc_n << " ms (blit=" << g_prof_blit_us / 1000
+							  << " render=" << g_prof_render_us / 1000 << " present=" << g_prof_present_us / 1000
+							  << " last)\n";
+					fflush(stdout);
+					acc_q = acc_f = acc_n = 0;
+					win_start = now;
+				}
+			}
+#endif
 		}
 
 		XObj->Finit();
@@ -524,6 +612,14 @@ void xtSetExit() {
 	//	SetEvent(hXNeedExitEvent);
 };
 
+#ifdef __SWITCH__
+// Taking the audio lock around pause/resume can deadlock with the audio thread after sleep.
+#	define XT_AUDIO_LOCK() ((void)0)
+#	define XT_AUDIO_UNLOCK() ((void)0)
+#else
+#	define XT_AUDIO_LOCK() SDL_LockAudioDevice(1)
+#	define XT_AUDIO_UNLOCK() SDL_UnlockAudioDevice(1)
+#endif
 extern int Pause;
 int xtDispatchMessage(SDL_Event *msg) {
 	int ret = 0;
@@ -543,37 +639,37 @@ int xtDispatchMessage(SDL_Event *msg) {
 		switch (msg->window.event) {
 		case SDL_WINDOWEVENT_SHOWN:
 			// Pause = 0;
-			SDL_LockAudioDevice(1);
+			XT_AUDIO_LOCK();
 			SDL_PauseAudioDevice(1, 0);
-			SDL_UnlockAudioDevice(1);
+			XT_AUDIO_UNLOCK();
 			std::cout << "window show" << std::endl;
 			break;
 		case SDL_WINDOWEVENT_HIDDEN:
 			// Pause = 1;
-			SDL_LockAudioDevice(1);
+			XT_AUDIO_LOCK();
 			SDL_PauseAudioDevice(1, 1);
-			SDL_UnlockAudioDevice(1);
+			XT_AUDIO_UNLOCK();
 			std::cout << "window hidden" << std::endl;
 			break;
 		case SDL_WINDOWEVENT_RESTORED:
 			// Pause = 0;
-			SDL_LockAudioDevice(1);
+			XT_AUDIO_LOCK();
 			SDL_PauseAudioDevice(1, 0);
-			SDL_UnlockAudioDevice(1);
+			XT_AUDIO_UNLOCK();
 			std::cout << "window restored" << std::endl;
 			break;
 		case SDL_WINDOWEVENT_FOCUS_LOST:
 			// Pause = 1;
-			SDL_LockAudioDevice(1);
+			XT_AUDIO_LOCK();
 			SDL_PauseAudioDevice(1, 1);
-			SDL_UnlockAudioDevice(1);
+			XT_AUDIO_UNLOCK();
 			std::cout << "window focus lost" << std::endl;
 			break;
 		case SDL_WINDOWEVENT_FOCUS_GAINED:
 			// Pause = 0;
-			SDL_LockAudioDevice(1);
+			XT_AUDIO_LOCK();
 			SDL_PauseAudioDevice(1, 0);
-			SDL_UnlockAudioDevice(1);
+			XT_AUDIO_UNLOCK();
 			std::cout << "window focus gained" << std::endl;
 			break;
 		}

@@ -40,3 +40,7 @@ Controls can be remapped in the in-game settings.
 The 2D interface layer arrives filled with an opaque colour over the 3D view on this platform; the port treats that
 colour as transparent inside the game view (see `src/road.cpp`, `lib/xgraph`). The root cause is unknown.
 Compiler flags in `cmake/SwitchDeps.cmake` disable some optimizations the engine's code does not tolerate.
+
+## Language
+The game language is chosen by a command-line flag (`-russian`) in the original; on the Switch create an empty file
+`sd:/switch/vangers/russian` to start in Russian (delete it to go back to English).
