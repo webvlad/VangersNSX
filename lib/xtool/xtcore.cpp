@@ -10,13 +10,39 @@
 #	include <unistd.h>
 extern "C" {
 #	include <switch/services/clkrst.h>
+#	include <switch/services/ssl.h>
+#	include <switch/services/nifm.h>
+#	include <switch/runtime/devices/socket.h>
+#	include <switch/applets/swkbd.h>
 }
+#	include <string.h>
 extern unsigned g_prof_blit_us, g_prof_render_us, g_prof_present_us;
 extern unsigned g_stage_us[8];
+void XJoystickReattach(const char *why);
 static bool g_debugLog = false; // empty file sd:/switch/vangers/debug enables PERF/SLOW lines
 static ClkrstSession g_cpuClk;
 static bool g_cpuClkOpen = false;
 static u32 g_cpuClkOrig = 0;
+char switchDefaultHost[256] = {0}; // from server.txt: prefilled into the Internet game screen
+int switchDefaultPort = 2197;
+int switchKeyboard(const char *initial, int maxLen, char *out, int outSize, int numeric) {
+	SwkbdConfig kbd;
+	out[0] = 0;
+	Result rc = swkbdCreate(&kbd, 0);
+	if (R_SUCCEEDED(rc)) {
+		swkbdConfigMakePresetDefault(&kbd);
+		if (numeric)
+			swkbdConfigSetType(&kbd, SwkbdType_NumPad);
+		swkbdConfigSetStringLenMax(&kbd, maxLen);
+		if (initial && initial[0])
+			swkbdConfigSetInitialText(&kbd, initial);
+		rc = swkbdShow(&kbd, out, outSize);
+		swkbdClose(&kbd);
+	}
+	std::cout << "Swkbd result 0x" << std::hex << rc << std::dec << std::endl;
+	fflush(stdout);
+	return R_SUCCEEDED(rc) ? 1 : 0;
+}
 static void switch_cpu_restore() {
 	if (g_cpuClkOpen) {
 		if (g_cpuClkOrig)
@@ -155,6 +181,51 @@ int main(int argc, char *argv[])
 	if (access("sdmc:/switch/vangers/russian", F_OK) == 0) {
 		setLang(RUSSIAN);
 		std::cout << "Language: Russian (flag file found)" << std::endl;
+	}
+	// BSD sockets for multiplayer (SDL_net). Without this every socket call fails.
+	{
+		Result src = socketInitializeDefault();
+		std::cout << "Sockets init: 0x" << std::hex << src << std::dec << std::endl;
+		if (R_SUCCEEDED(src))
+			atexit(socketExit);
+	}
+	// No command line: sd:/switch/vangers/server.txt with "host" or "host:port" connects to that
+	// server on start (same as -server/-port on the desktop). Second line "new"/"any"/<id> = -game.
+	{
+		static char srvHost[256];
+		FILE *f = fopen("sdmc:/switch/vangers/server.txt", "r");
+		if (f) {
+			char line[256] = {0}, game[64] = {0};
+			if (fgets(line, sizeof(line), f)) {
+				line[strcspn(line, "\r\n \t")] = 0;
+				char *colon = strchr(line, ':');
+				if (colon) {
+					*colon = 0;
+					autoconnectPort = (unsigned short)strtol(colon + 1, NULL, 0);
+				}
+				if (line[0]) {
+					strcpy(srvHost, line);
+					strcpy(switchDefaultHost, line);
+					switchDefaultPort = autoconnectPort;
+					autoconnect = true;
+					autoconnectHost = srvHost;
+					std::cout << "Autoconnect: " << srvHost << ":" << autoconnectPort << std::endl;
+				}
+			}
+			if (fgets(game, sizeof(game), f)) {
+				game[strcspn(game, "\r\n \t")] = 0;
+				if (game[0]) {
+					autoconnectJoinGame = true;
+					if (!strcmp(game, "new"))
+						autoconnectGameID = 0;
+					else if (!strcmp(game, "any"))
+						autoconnectGameID = -1;
+					else
+						autoconnectGameID = (int)strtol(game, NULL, 0);
+				}
+			}
+			fclose(f);
+		}
 	}
 	// The engine is CPU bound (software renderer): ask for the high CPU clock (1785 MHz).
 	if (R_SUCCEEDED(clkrstInitialize())) {
@@ -324,6 +395,7 @@ int main(int argc, char *argv[])
 				}
 				static Uint32 last_flush = 0;
 				if (now - last_flush >= 2000) { // keep the log current even if the game crashes
+					XJoystickReattach("poll");
 					fflush(stdout);
 					last_flush = now;
 				}
@@ -639,6 +711,16 @@ int xtDispatchMessage(SDL_Event *msg) {
 	case SDL_QUIT:
 		xtSetExit();
 		break;
+#ifdef __SWITCH__
+	case SDL_CONTROLLERDEVICEADDED:
+	case SDL_CONTROLLERDEVICEREMOVED:
+	case SDL_JOYDEVICEADDED:
+	case SDL_JOYDEVICEREMOVED:
+		std::cout << "Pad device event 0x" << std::hex << msg->type << std::dec << " which=" << msg->cdevice.which
+				  << std::endl;
+		XJoystickReattach("device event");
+		break;
+#endif
 	case SDL_WINDOWEVENT:
 		switch (msg->window.event) {
 		case SDL_WINDOWEVENT_SHOWN:

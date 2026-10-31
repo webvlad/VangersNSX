@@ -21,6 +21,7 @@ extern XJOYSTATE XJoystickState;
 
 // prototypes
 bool XJoystickInit();
+void XJoystickReattach(const char *why);
 void XJoystickCleanup();
 int XJoystickInput(); // updates XJoystickState if !0
 

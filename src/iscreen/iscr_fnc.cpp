@@ -98,6 +98,10 @@ extern int iChatON;
 extern int IsMainMenu;
 
 extern bool autoconnect;
+#ifdef __SWITCH__
+extern char switchDefaultHost[256];
+extern int switchDefaultPort;
+#endif
 extern char *autoconnectHost;
 extern unsigned short autoconnectPort;
 extern int autoconnectJoinGame;
@@ -617,10 +621,21 @@ void iQuantFirst(void) {
 		iSetOptionValueCHR(iPLAYER_NAME2, (lang() == RUSSIAN ? "‚ ­ЈҐа" : "Vanger"));
 		iSetOptionValueCHR(iPLAYER_PASSWORD, iSTR_DefaultPassword);
 		iSetOptionValueCHR(iHOST_NAME, "v5.vangers.net");
+#ifdef __SWITCH__
+		if (switchDefaultHost[0])
+			iSetOptionValueCHR(iHOST_NAME, switchDefaultHost);
+#endif
 		iSetOptionValueCHR(iSERVER_NAME, iSTR_NONE);
 		iSetOptionValueCHR(iPROXY_SERVER, "192.1.1.1");
 		iSetOptionValueCHR(iPROXY_PORT, "1080");
 		iSetOptionValueCHR(iSERVER_PORT, "2197");
+#ifdef __SWITCH__
+		if (switchDefaultHost[0]) {
+			char portStr[16];
+			snprintf(portStr, sizeof(portStr), "%d", switchDefaultPort);
+			iSetOptionValueCHR(iSERVER_PORT, portStr);
+		}
+#endif
 		iGetIP();
 #endif
 		iInitMultiGames();
@@ -650,6 +665,8 @@ void iQuantFirst(void) {
 			iEndGameFlag = 1;
 		} else if (autoconnect) {
 			iScrDisp->curScr = (iScreen *)iScrDisp->get_object("iSearch server screen");
+			XSocketInit();
+			iGetIP();
 			avaible_servers.find_servers_in_the_internet(autoconnectHost, autoconnectPort);
 			if (avaible_servers.size() > 0) {
 				iFirstServerPtr = avaible_servers.first();

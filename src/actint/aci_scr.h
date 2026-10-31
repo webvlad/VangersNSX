@@ -421,6 +421,9 @@ struct aciScreenDispatcher {
 	void flush(void);
 
 	void PrepareInput(int obj_id);
+#ifdef __SWITCH__
+	void SwitchKeyboardInput(void);
+#endif
 	void InputQuant(SDL_Event *event);
 	void CancelInput(void);
 	void DoneInput(void);

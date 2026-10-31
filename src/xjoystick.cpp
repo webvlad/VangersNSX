@@ -147,6 +147,30 @@ bool XJoystickInit() {
 	}
 }
 
+// Re-open the controller if the opened handle went stale (e.g. Joy-Cons re-enumerated after
+// sleep). SDL only sends SDL_CONTROLLER* events for opened controllers, so a stale handle
+// silently kills all pad input.
+void XJoystickReattach(const char *why) {
+	if (ctrl && SDL_GameControllerGetAttached(ctrl))
+		return;
+	if (ctrl) {
+		SDL_GameControllerClose(ctrl);
+		ctrl = NULL;
+		joy = NULL;
+	}
+	for (int i = 0; i < SDL_NumJoysticks(); ++i) {
+		if (!SDL_IsGameController(i))
+			continue;
+		ctrl = SDL_GameControllerOpen(i);
+		if (ctrl) {
+			joy = SDL_GameControllerGetJoystick(ctrl);
+			JoystickAvailable = 1;
+			printf("Controller reattached (%s): index %i '%s'\n", why, i, SDL_GameControllerNameForIndex(i));
+			return;
+		}
+	}
+}
+
 SDL_GameController *get_gamecontroller() {
 	return ctrl;
 }

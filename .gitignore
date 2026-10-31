@@ -48,3 +48,8 @@ out/
 *.nro
 *.elf
 *.nacp
+
+# Dedicated server deploy (server/deploy)
+/build-server/
+/build-server-local/
+/server-local-run/

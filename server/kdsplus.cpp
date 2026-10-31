@@ -1,4 +1,5 @@
 
+#include <csignal>
 #include "kdsplus.h"
 #include <chrono>
 #include <thread>
@@ -27,6 +28,12 @@ Server *server;
 extern int __internal_argc;
 extern char **__internal_argv;
 
+// SIGINT/SIGTERM (systemd stop, Ctrl+C): leave the main loop normally so that the
+// Server destructor runs and Rating.lst is saved (it is written only there).
+static void on_stop_signal(int) {
+	GlobalExit = 1;
+}
+
 int xtInitApplication(void) {
 #ifdef _WIN32
 	SetConsoleTitle("Vangers Server ");
@@ -42,6 +49,8 @@ int xtInitApplication(void) {
 	// SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 	ComlineAnalyze(__internal_argc, __internal_argv);
 	//	ErrH.SetFlags(XERR_CTRLBRK);
+	std::signal(SIGINT, on_stop_signal);
+	std::signal(SIGTERM, on_stop_signal);
 
 	/* initialize SDL */
 	if (SDL_Init(0) == -1) {

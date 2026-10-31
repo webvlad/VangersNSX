@@ -2929,6 +2929,10 @@ void iScreenDispatcher::ProcessEvent(iScreenEvent *p) {
 						el = (iScreenElement *)cm->obj;
 						init_input_string(el);
 						cur_max_input = cm->value;
+#ifdef __SWITCH__
+						if (!(el->flags & EL_KEY_NAME))
+							switch_keyboard_input(cm->value - 1);
+#endif
 					}
 					break;
 				case EV_MOVE_SCREEN:
@@ -3612,6 +3616,64 @@ void iStringElement::init_string(const char *ptr) {
 void iS_StringElement::init_string(char *ptr) {
 	strcpy(string, ptr);
 }
+
+#ifdef __SWITCH__
+int switchKeyboard(const char *initial, int maxLen, char *out, int outSize, int numeric);
+// Text fields of the menus: show the system keyboard once, then finish the input as if Enter
+// (OK) or Escape (cancel) was pressed, so the menu can never be stuck in the input mode.
+void iScreenDispatcher::switch_keyboard_input(int maxLen) {
+	unsigned char *ptr = NULL;
+	if (ActiveEl->type == I_STRING_ELEM)
+		ptr = (unsigned char *)(((iStringElement *)ActiveEl)->string);
+	else if (ActiveEl->type == I_S_STRING_ELEM)
+		ptr = (unsigned char *)(((iS_StringElement *)ActiveEl)->string);
+	if (!ptr)
+		return;
+	int numeric = (ActiveEl->flags & EL_NUMBER) ? 1 : 0;
+	char init[256] = {0}, out[512] = {0};
+	int n = 0;
+	for (const unsigned char *c = (const unsigned char *)BackupStr; *c && n < 255; c++)
+		if (*c >= 32 && *c < 127)
+			init[n++] = *c;
+	if (maxLen <= 0 || maxLen > 200)
+		maxLen = 200;
+	int ok = switchKeyboard(init, maxLen, out, sizeof(out), numeric);
+	if (!ok) {
+		strcpy((char *)ptr, BackupStr);
+	} else {
+		int len = 0;
+		for (unsigned char *c = (unsigned char *)out; *c && len < maxLen;) {
+			unsigned char chr;
+			if (*c < 0x80) {
+				chr = *c++;
+			} else if ((*c & 0xE0) == 0xC0 && c[1]) {
+				chr = UTF8toCP866((unsigned short)((c[0] << 8) | c[1]));
+				c += 2;
+			} else {
+				c++;
+				while ((*c & 0xC0) == 0x80)
+					c++;
+				chr = '?';
+			}
+			if (numeric && (chr < '0' || chr > '9'))
+				continue;
+			ptr[len++] = chr;
+		}
+		ptr[len] = 0;
+	}
+	flags ^= SD_INPUT_STRING;
+	flags |= SD_FINISH_INPUT;
+	iListElementPtr *tmp;
+	iScreenObject *obj = (iScreenObject *)ActiveEl->owner;
+	obj->flags |= OBJ_REINIT;
+	if (!(obj->flags & OBJ_REDRAW)) {
+		obj->flags |= OBJ_REDRAW;
+		_iALLOC_(iListElementPtr, tmp);
+		tmp->ptr = (iListElement *)obj;
+		drwObjHeap->connect((iListElement *)tmp);
+	}
+}
+#endif
 
 void iScreenDispatcher::init_input_string(iScreenElement *p) {
 	int sz;

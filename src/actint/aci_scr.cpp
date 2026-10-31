@@ -13,6 +13,10 @@
 
 #include "../iscreen/iscreen.h"
 #include "../network.h"
+#ifdef __SWITCH__
+// lib/xtool/xtcore.cpp: shows the system keyboard; 1 = OK (UTF-8 text in out), 0 = cancelled/failed.
+int switchKeyboard(const char *initial, int maxLen, char *out, int outSize, int numeric);
+#endif
 
 #ifndef _WIN32
 #	include <arpa/inet.h> // ntohl() FIXME: remove
@@ -1615,9 +1619,53 @@ void aciScreenDispatcher::PrepareInput(int obj_id) {
 		p->string[sz] = 0;
 		p->flags |= ACS_ACTIVE_STRING;
 		activeInput = p;
-		SDL_StartTextInput(); // Switch: opens the system software keyboard
+#ifdef __SWITCH__
+		SwitchKeyboardInput();
+#else
+		SDL_StartTextInput();
+#endif
 	}
 }
+
+#ifdef __SWITCH__
+// Show the system keyboard directly (libnx swkbd) instead of relying on SDL's text input state.
+// Whatever happens (OK, cancel, applet failure) the field leaves the input mode, so the game can
+// never get stuck waiting for text that will not come.
+void aciScreenDispatcher::SwitchKeyboardInput(void) {
+	aciScreenInputField *p = activeInput;
+	char init[256] = {0}, out[512] = {0};
+	int n = 0;
+	for (const unsigned char *c = (const unsigned char *)acsBackupStr; c && *c && n < 255; c++)
+		if (*c >= 32 && *c < 127)
+			init[n++] = *c;
+
+	if (!switchKeyboard(init, p->MaxStrLen > 0 ? p->MaxStrLen : 32, out, sizeof(out), 0)) {
+		CancelInput(); // cancelled by the user or the applet could not start
+		return;
+	}
+
+	// UTF-8 -> game encoding (ASCII + CP866 cyrillic), then finish as if Enter was pressed.
+	int len = 0;
+	for (unsigned char *c = (unsigned char *)out; *c && len < p->MaxStrLen;) {
+		unsigned char chr;
+		if (*c < 0x80) {
+			chr = *c++;
+		} else if ((*c & 0xE0) == 0xC0 && c[1]) {
+			chr = UTF8toCP866((unsigned short)((c[0] << 8) | c[1]));
+			c += 2;
+		} else {
+			c++;
+			while ((*c & 0xC0) == 0x80)
+				c++;
+			chr = '?';
+		}
+		p->string[len++] = chr;
+	}
+	p->string[len] = '_';
+	p->string[len + 1] = 0;
+	DoneInput();
+}
+#endif
 
 void aciScreenInputField::alloc_str(void) {
 	string = new char[MaxStrLen + 2];

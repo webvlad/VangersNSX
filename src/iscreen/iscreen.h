@@ -793,6 +793,9 @@ struct iScreenDispatcher: public iList {
 
 	void input_string_quant(void);
 	void init_input_string(iScreenElement *p);
+#ifdef __SWITCH__
+	void switch_keyboard_input(int maxLen);
+#endif
 
 	void prepare(void);
 	void redraw(int mode = 0);

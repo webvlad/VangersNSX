@@ -53,3 +53,13 @@ ticks at 20 Hz). Delete the file to return to 20 FPS. Heavy scenes may drop belo
 By default `stdout.txt` only gets start-up information and errors. Create an empty file `sd:/switch/vangers/debug`
 to also write per-5-second FPS statistics (`PERF`) and a per-stage breakdown of every frame longer than 120 ms (`SLOW frame`).
 Please attach such a log when reporting performance problems.
+
+## Multiplayer (experimental)
+
+Sockets are initialised at start (`Sockets init: 0x0` in `stdout.txt`). Two ways to connect:
+
+- In the menu: Multiplayer -> Internet, edit the server host with the system keyboard (OK/Cancel both leave
+  the field), then search. If `server.txt` exists, its host and port are prefilled there.
+- Autoconnect: put `server.txt` next to the `.nro` (`sd:/switch/vangers/server.txt`):
+  first line `host` or `host:port` (default port 2197); optional second line `new`, `any`
+  or a game id to join right away (same as `-server/-port/-game` on desktop).

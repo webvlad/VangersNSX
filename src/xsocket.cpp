@@ -54,6 +54,16 @@ int XSocketInit(int ErrHUsed) {
 		return 0;
 	}
 
+#ifdef __SWITCH__
+	// libnx: gethostname/resolve of the own name is not useful; gethostid() returns the
+	// console's current IPv4 address (network byte order), 0 when offline.
+	strcpy(XSocketLocalHostName, "switch");
+	XSocketLocalHostExternADDR.host = (Uint32)gethostid();
+	XSocketLocalHostExternADDR.port = 0;
+	XSocketLocalHostADDR = XSocketLocalHostExternADDR;
+	XSocketInitializationOK = 1;
+	return 1;
+#endif
 	if (gethostname(XSocketLocalHostName, HOST_NAME_MAX) == -1) {
 		XSOCKET_ERROR("gethostname failed", "");
 		return 0;

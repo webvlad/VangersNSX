@@ -1,0 +1,27 @@
+[Unit]
+Description=Vangers multiplayer server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vangers
+Group=vangers
+EnvironmentFile=/etc/vangers-server.env
+# Rating.lst and VangersServer.log are written to the current directory.
+WorkingDirectory=/var/lib/vangers-server
+ExecStart=/opt/vangers-server/bin/vangers_server /p${VANGERS_PORT} $VANGERS_ARGS
+# SIGTERM makes the server exit normally and save Rating.lst.
+KillSignal=SIGTERM
+TimeoutStopSec=20
+Restart=always
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/vangers-server
+
+[Install]
+WantedBy=multi-user.target
