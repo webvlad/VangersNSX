@@ -148,10 +148,12 @@ int XSocket::open(char *name, int port) {
 	if (!name)
 		ErrH.Abort("NULL inet_addr() argument...");
 
+	std::cout << "XSocket::open resolving " << name << ":" << port << std::endl;
 	if (SDLNet_ResolveHost(&addr, name, port) == -1) {
 		XSOCKET_ERROR("TCP socket hostname resolution failed", SDLNet_GetError());
 		return 0;
 	}
+	std::cout << "XSocket::open resolved, connecting" << std::endl;
 
 	return tcp_open();
 }

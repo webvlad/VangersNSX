@@ -952,6 +952,7 @@ void ServersList::clear_states() {
 	}
 }
 int ServersList::talk_to_server(int IP, int port, char *domain_name, int only_new_game) {
+	std::cout << "talk_to_server: " << (domain_name ? domain_name : "(null)") << ":" << port << std::endl;
 	XSocket sock;
 	if (IP) {
 		sock.open(IP, port);
@@ -963,8 +964,10 @@ int ServersList::talk_to_server(int IP, int port, char *domain_name, int only_ne
 		// 		else
 		// 			sock.open_by_socks5(domain_name,port,iProxyServer,iProxyPort);
 	}
+	std::cout << "talk_to_server: socket " << (!sock ? "FAILED" : "open") << std::endl;
 	if (!sock || !identification(sock))
 		return 0;
+	std::cout << "talk_to_server: identified" << std::endl;
 
 	XBuffer servers_buffer(10000);
 	servers_buffer < short(1) < char(GAMES_LIST_QUERY);
@@ -983,6 +986,7 @@ int ServersList::talk_to_server(int IP, int port, char *domain_name, int only_ne
 	short event_size;
 	servers_buffer.set(0);
 	servers_buffer > event_size > event_ID > n_games;
+	std::cout << "talk_to_server: reply event " << (int)event_ID << " games " << (int)n_games << std::endl;
 	if (event_ID != GAMES_LIST_RESPONSE)
 		return 0;
 	if (only_new_game)

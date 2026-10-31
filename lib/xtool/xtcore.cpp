@@ -207,14 +207,14 @@ int main(int argc, char *argv[])
 					strcpy(srvHost, line);
 					strcpy(switchDefaultHost, line);
 					switchDefaultPort = autoconnectPort;
-					autoconnect = true;
-					autoconnectHost = srvHost;
+					autoconnectHost = srvHost; // autoconnect itself only with the second line (below)
 					std::cout << "Autoconnect: " << srvHost << ":" << autoconnectPort << std::endl;
 				}
 			}
 			if (fgets(game, sizeof(game), f)) {
 				game[strcspn(game, "\r\n \t")] = 0;
-				if (game[0]) {
+				if (game[0] && autoconnectHost) {
+					autoconnect = true;
 					autoconnectJoinGame = true;
 					if (!strcmp(game, "new"))
 						autoconnectGameID = 0;

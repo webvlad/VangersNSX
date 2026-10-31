@@ -61,5 +61,5 @@ Sockets are initialised at start (`Sockets init: 0x0` in `stdout.txt`). Two ways
 - In the menu: Multiplayer -> Internet, edit the server host with the system keyboard (OK/Cancel both leave
   the field), then search. If `server.txt` exists, its host and port are prefilled there.
 - Autoconnect: put `server.txt` next to the `.nro` (`sd:/switch/vangers/server.txt`):
-  first line `host` or `host:port` (default port 2197); optional second line `new`, `any`
-  or a game id to join right away (same as `-server/-port/-game` on desktop).
+  first line `host` or `host:port` (default port 2197) is prefilled in the menu; an optional second
+  line `new`, `any` or a game id connects and joins right at start (same as `-server/-port/-game` on desktop).
